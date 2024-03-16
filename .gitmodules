@@ -1,0 +1,3 @@
+[submodule "dansk-diceware"]
+	path = dansk-diceware
+	url = https://github.com/aslak/dansk-diceware.git

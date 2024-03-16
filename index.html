@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dansk Diceware</title>
+    <style>
+        html {
+            font-family: sans-serif;
+            background-color: #ffeee0;
+            color: #402030;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        h1, h2 {
+            text-align: center;
+        }
+
+        main, #output, #rolls, #output-phrase {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        #setup {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        #number-of-words {
+            flex-basis: 100%;
+            justify-content: center;
+            display: flex;
+            gap: 10px;
+        }
+        #roll {
+            margin-top: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 5px;
+            background-color: #ffcc99;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background-color: #ffbb77;
+        }
+        .btn.active {
+            background-color: #f8a755;
+            box-shadow: inset 2px 2px 5px 0px #96693a;
+        }
+
+        #output-wrapper {
+            background-color: #ffffff;
+            padding: 20px;
+        }
+        #output {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            color: #000000;
+        }
+        .word {
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #ffcccc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 12px;
+        }
+        .word-text {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        #roll-wrapper {
+            background-color: #ffffff;
+        }
+        #all-rolls {
+            display: flex;
+            font-size: 1.4em;
+        }
+        #last-roll {
+            display: block;
+            text-align: center;
+            font-size: 4em;
+            margin: 0 auto;
+        }
+        #output-phrase {
+            text-align: center;
+            font-size: 1.4em;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Dansk Diceware</h1>
+        <h2>En generator af danske adgangssætninger</h2>
+        
+        <div id="setup">
+            <p>Vælg din ønskede kodelængde og klik "Rul"</p>
+            <div id="number-of-words" role="group">
+                <button id="button-2" class="btn setup-btn">2</button>
+                <button id="button-3" class="btn setup-btn">3</button>
+                <button id="button-4" class="btn setup-btn">4</button>
+                <button id="button-5" class="btn setup-btn active">5</button>
+                <button id="button-6" class="btn setup-btn">6</button>
+                <button id="button-7" class="btn setup-btn">7</button>
+                <button id="button-8" class="btn setup-btn">8</button>
+            </div>
+            <button id="roll" class="btn" onclick="roll_words()">Rul</button>
+        </div>
+    </header>
+
+    <div id="roll-wrapper">
+        <div id="rolls">
+            <span id="last-roll"></span>
+            <div id="all-rolls"></div>
+        </div>
+    </div>
+    
+    <div id="output-wrapper">
+        <template id="output-word-template">
+            <div class="word">
+                <span class="word-text">_eksempel_</span>
+                <span class="word-rolls">000000</span>
+            </div> 
+        </template>
+        <h2>Dine ord er</h2>
+        <div id="output">
+
+        </div>
+
+        <h2>Din adgangssætning er</h2>
+        <div id="output-phrase">
+            <span id="phrase">ABCD1234</span>
+        </div> 
+    </div>
+
+    <main>
+        <h2>Uddybende info</h2>
+
+        <p>
+            Denne side er baseret på ideen om at bruge en række tilfældige
+            ord som adgangskode. Hvert ord vælges ved at rulle med en terning
+            og slå op i en liste over ord, der er blevet tildelt et nummer.
+        </p>
+
+        <p>
+            Diceware-metoden blev opfundet af Arnold Reinhold i 1995 og er
+            blevet populær som en måde at lave stærke adgangskoder på, der
+            er nemme at huske. 
+        </p>
+    
+        <p>Med 5 terningekast til hvert ord giver 7776 forskellige mulige ord. 
+            Sætter man nu sådanne 5 ord sammen, får man en sætning, der 
+            er nem at huske og som giver stort set lige så god beskyttelse som 
+            en "stærk" kode bestående af 10 tilfældige tegn.
+        </p>
+
+        <p>
+            Mere teknisk, så giver hvert ord 12.9 bits af entropi, og 5 ord
+            giver 64.5 bits, sammenlignet med 10 tilfældige ASCII-tegn som giver
+            65.7 bits entropi
+             (sættet af a-z, A-Z, 0-9 og specialtegn er 95 tegn i alt)
+        </p>
+
+        <p>
+            Siden her er inspireret af <a href="https://diceware.dmuth.org/">diceware.dmuth.org</a> og
+            implementeret med <a href="https://github.com/aslak/dansk-diceware/">Aslak Ransbys danske Diceware ordliste</a>.
+            Al koden kan køres lokalt, og der er ingen serverkald.
+        </p>
+    </main>
+
+
+    <script>
+        const word_list = "dansk-diceware/dansk-diceware.txt";
+        let words = [];
+        let target_length = 5;
+
+        document.getElementById("output-wrapper").hidden = true;
+
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        async function fetch_words() {
+            await fetch(word_list)
+                .then(response => response.text())
+                .then(text => {
+                    const lines = text.split("\n");
+                    words = lines.map(line => line.split(" ")[1]);
+                });
+        }
+
+        function unicode_dice(i) {
+            return String.fromCodePoint(0x2680 + i);
+        }
+
+
+        function capitalize_first_letter(s) {
+            return s[0].toUpperCase() + s.slice(1);
+        }
+
+        function roll_word(len = 5) {
+            const array = new Uint8Array(len);
+            self.crypto.getRandomValues(array);
+
+            let base6string = "";
+            let rolls = [];
+            for (const i of array) {
+                base6string = base6string + (i%6);
+                rolls.push(i%6+1);
+            }
+            let idx = parseInt(base6string, 6);
+            let word = words[idx];
+            return {word, rolls};
+        }
+
+        async function roll_words() {
+            const roll_wrapper = document.getElementById("roll-wrapper");
+            const output_wrapper = document.getElementById("output-wrapper");
+            const output = document.getElementById("output");
+            const word_template = document.getElementById("output-word-template");
+            const num_words = parseInt(document.querySelector(".setup-btn.active").id.split("-")[1]);
+            output.innerHTML = "";
+            output_wrapper.hidden = true;
+            let all_rolls = "";
+            let phrase = "";
+            for (let i = 0; i < num_words; i++) {
+                const {word, rolls} = roll_word();
+                const word_element = word_template.content.cloneNode(true);
+                const roll_symbols = rolls.map(x => unicode_dice(x-1)).join("");
+                word_element.querySelector(".word-text").textContent = word;
+                word_element.querySelector(".word-rolls").textContent = roll_symbols;
+                output.appendChild(word_element);
+                all_rolls += roll_symbols;
+                phrase += capitalize_first_letter(word);
+            }
+            document.getElementById("phrase").textContent = phrase;
+            
+            roll_wrapper.hidden = false;
+            rolls_div = document.getElementById("all-rolls");
+            last_roll_span = document.getElementById("last-roll");
+            rolls_div.textContent = "";
+            last_roll_span.textContent = "";
+
+            for (let i = 0; i < all_rolls.length; i++) {
+                const roll = all_rolls[i];
+                const roll_element = document.createElement("span");
+                roll_element.textContent = roll;
+                last_roll_span.textContent = roll;
+                await sleep(50);
+                rolls_div.appendChild(roll_element);
+            }
+            await sleep(500);
+
+            output_wrapper.hidden = false;
+            roll_wrapper.hidden = true;
+        }
+
+        // Register button selector event listeners
+        const buttons = document.querySelectorAll(".setup-btn");
+        for (const button of buttons) {
+            button.addEventListener("click", () => {
+                for (const button of buttons) {
+                    button.classList.remove("active");
+                }
+                button.classList.add("active");
+                target_length = parseInt(button.id.split("-")[1]);
+            });
+        }
+
+        fetch_words()
+        .then(() => console.log("Words fetched"))
+        .then(() => {
+            const word = roll_word();
+            console.log(word);
+        });
+    </script>
+</body> 
+</html>
